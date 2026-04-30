@@ -1,0 +1,12 @@
+# id,username,password,role,company_id,cgpa,ban_count,daily_bookings
+1,admin_root,admin123,ADMIN,0,0.0,0,0
+2,hr_google,google_hr,HR,1,0.0,0,0
+3,hr_microsoft,ms_hr,HR,2,0.0,0,0
+4,hr_amazon,amz_hr,HR,3,0.0,0,0
+5,student_alice,alice123,STUDENT,0,9.2,0,2
+6,student_bob,bob456,STUDENT,0,8.7,0,0
+7,student_charlie,charlie789,STUDENT,0,9.8,0,0
+8,student_diana,diana321,STUDENT,0,7.5,0,0
+9,student_eve,eve654,STUDENT,0,8.1,0,0
+10,Raghu,123,STUDENT,0,7.0,0,1
+11,Raghu_hr,123,HR,1,0.0,0,0

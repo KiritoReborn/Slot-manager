@@ -1,0 +1,20 @@
+# Build outputs
+placement_drive/bin/
+*.o
+
+# Runtime data and logs
+placement_drive/data/outcomes.bin
+placement_drive/data/placement_state.bin
+placement_drive/data/placement_audit.log
+placement_drive/data/server.pid
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.log
+
+# IDE/editor
+.vscode/
+
+
