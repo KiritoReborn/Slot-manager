@@ -12,6 +12,7 @@ typedef struct {
 static ServerContext g_ctx;
 static volatile sig_atomic_t g_stop_requested = 0;
 
+// decrements active conn count + releases sem
 static void decrease_active_connection_count(ServerContext *ctx) {
     if (!ctx || !ctx->state) {
         return;
@@ -28,6 +29,7 @@ static void decrease_active_connection_count(ServerContext *ctx) {
     }
 }
 
+// increments active conn count
 static void increase_active_connection_count(ServerContext *ctx) {
     if (!ctx || !ctx->state) {
         return;
@@ -38,6 +40,7 @@ static void increase_active_connection_count(ServerContext *ctx) {
     pthread_mutex_unlock(&ctx->state->shm_lock);
 }
 
+// SIGINT handler to stop server
 static void signal_sigint(int signo) {
     (void)signo;
     g_stop_requested = 1;
@@ -47,12 +50,14 @@ static void signal_sigint(int signo) {
     }
 }
 
+// SIGCHLD handler to reap kids
 static void signal_sigchld(int signo) {
     (void)signo;
     while (waitpid(-1, NULL, WNOHANG) > 0) {
     }
 }
 
+// wires up signal handlers
 static int install_signal_handlers(void) {
     struct sigaction sa;
 
@@ -74,6 +79,7 @@ static int install_signal_handlers(void) {
     return 0;
 }
 
+// sends a response packet
 static void send_reply(int fd, MessageType type, int user_id, const char *payload) {
     NetworkPacket response;
     memset(&response, 0, sizeof(response));
@@ -85,6 +91,7 @@ static void send_reply(int fd, MessageType type, int user_id, const char *payloa
     send_packet(fd, &response);
 }
 
+// builds a short view summary string
 static void render_view_summary(ServerContext *ctx, char *out, size_t out_sz) {
     int active = 0;
     int capacity = 0;
@@ -117,6 +124,7 @@ static void render_view_summary(ServerContext *ctx, char *out, size_t out_sz) {
     }
 }
 
+// enforces daily booking cap
 static int enforce_student_booking_limit(int student_id) {
     UserRecord user;
     if (auth_lookup_user_by_id(student_id, &user) != 0) {
@@ -129,6 +137,7 @@ static int enforce_student_booking_limit(int student_id) {
     return 0;
 }
 
+// parses swap payload: company round slot
 static int parse_swap_target(const char *payload, int *company_id, int *round_id, int *slot_id) {
     if (!payload || !company_id || !round_id || !slot_id) {
         return -1;
@@ -136,6 +145,7 @@ static int parse_swap_target(const char *payload, int *company_id, int *round_id
     return sscanf(payload, "%d %d %d", company_id, round_id, slot_id) == 3 ? 0 : -1;
 }
 
+// parses HH:MM-HH:MM into minutes
 static int parse_time_window_minutes(const char *window, int *start_min, int *end_min) {
     int sh;
     int sm;
@@ -158,6 +168,7 @@ static int parse_time_window_minutes(const char *window, int *start_min, int *en
     return 0;
 }
 
+// formats minutes back to HH:MM-HH:MM
 static void format_time_window_minutes(int start_min, int end_min, char *out, size_t out_sz) {
     int sh = (start_min / 60) % 24;
     int sm = start_min % 60;
@@ -166,6 +177,7 @@ static void format_time_window_minutes(int start_min, int end_min, char *out, si
     snprintf(out, out_sz, "%02d:%02d-%02d:%02d", sh, sm, eh, em);
 }
 
+// finds first free slot in round
 static int find_first_free_slot(ServerContext *ctx, int company_id, int round_id, int *out_slot_id) {
     if (!ctx || !ctx->state || !out_slot_id || company_id <= 0 || company_id > MAX_COMPANIES) {
         return -1;
@@ -191,6 +203,7 @@ static int find_first_free_slot(ServerContext *ctx, int company_id, int round_id
     return -1;
 }
 
+// shifts later slots after overrun
 static int shift_overrun_and_queue_alerts(ServerContext *ctx,
                                           int company_id,
                                           int round_id,
@@ -249,6 +262,7 @@ static int shift_overrun_and_queue_alerts(ServerContext *ctx,
     return affected_students;
 }
 
+// routes student requests
 static void handle_student_request(ServerContext *ctx, int fd, const UserRecord *user, const NetworkPacket *req) {
     int banned = 0;
 
@@ -365,6 +379,7 @@ static void handle_student_request(ServerContext *ctx, int fd, const UserRecord 
     }
 }
 
+// routes HR requests
 static void handle_hr_request(ServerContext *ctx, int fd, const UserRecord *user, const NetworkPacket *req) {
 
     switch (req->type) {
@@ -477,6 +492,7 @@ static void handle_hr_request(ServerContext *ctx, int fd, const UserRecord *user
     }
 }
 
+// routes admin requests
 static void handle_admin_request(ServerContext *ctx, int fd, const UserRecord *user, const NetworkPacket *req) {
     (void)user;
 
@@ -517,6 +533,7 @@ static void handle_admin_request(ServerContext *ctx, int fd, const UserRecord *u
     }
 }
 
+// thread loop for one client
 static void *client_handler(void *arg) {
     HandlerArgs *h = (HandlerArgs *)arg;
     ServerContext *ctx = h->ctx;
@@ -553,6 +570,7 @@ static void *client_handler(void *arg) {
     return NULL;
 }
 
+// creates/binds/listens on socket
 static int setup_listener(ServerContext *ctx) {
     struct sockaddr_in addr;
     int opt = 1;
@@ -580,6 +598,7 @@ static int setup_listener(ServerContext *ctx) {
     return 0;
 }
 
+// main server entry
 int main(void) {
     if (ipc_initialize(&g_ctx, 1) != 0) {
         fprintf(stderr, "Failed to initialize IPC resources.\n");

@@ -1,5 +1,6 @@
 #include "../common/models.h"
 
+// resolves company/round/slot pointers
 static int get_slot_ref(ServerContext *ctx,
                         int company_id,
                         int round_id,
@@ -40,6 +41,7 @@ static int get_slot_ref(ServerContext *ctx,
     return 0;
 }
 
+// checks if student already booked in company
 static int student_has_booking_in_company(ServerContext *ctx, int student_id, int company_id) {
     Company *company;
 
@@ -64,6 +66,7 @@ static int student_has_booking_in_company(ServerContext *ctx, int student_id, in
     return 0;
 }
 
+// converts cgpa to waitlist priority
 static long waitlist_priority_from_cgpa(float cgpa) {
     long mtype = (long)(1000 - (cgpa * 100.0f) + 0.5f);
     if (mtype < 1) {
@@ -75,6 +78,7 @@ static long waitlist_priority_from_cgpa(float cgpa) {
     return mtype;
 }
 
+// inserts into shared waitlist array
 static void waitlist_shared_insert(PlacementState *state, const struct waitlist_msgbuf *msg) {
     int i;
 
@@ -105,6 +109,7 @@ static void waitlist_shared_insert(PlacementState *state, const struct waitlist_
     pthread_mutex_unlock(&state->waitlist_lock);
 }
 
+// removes entry from shared waitlist
 static void waitlist_shared_remove(PlacementState *state, int student_id, int company_id, int round_id, int slot_id) {
     int i;
 
@@ -126,6 +131,7 @@ static void waitlist_shared_remove(PlacementState *state, int student_id, int co
     pthread_mutex_unlock(&state->waitlist_lock);
 }
 
+// enqueues student into waitlist
 int slot_manager_enqueue_waitlist(ServerContext *ctx,
                                   int student_id,
                                   const char *student_name,
@@ -166,6 +172,7 @@ int slot_manager_enqueue_waitlist(ServerContext *ctx,
     return 0;
 }
 
+// pulls next waitlist msg for slot
 static int dequeue_waitlist_for_slot(ServerContext *ctx, int company_id, int round_id, int slot_id, struct waitlist_msgbuf *out_msg) {
     struct waitlist_msgbuf deferred[64];
     int deferred_count = 0;
@@ -204,6 +211,7 @@ static int dequeue_waitlist_for_slot(ServerContext *ctx, int company_id, int rou
     return 0;
 }
 
+// promotes top waitlist into slot
 int slot_manager_promote_waitlist(ServerContext *ctx, int company_id, int round_id, int slot_id) {
     Company *company;
     InterviewRound *round;
@@ -252,6 +260,7 @@ int slot_manager_promote_waitlist(ServerContext *ctx, int company_id, int round_
     return 0;
 }
 
+// books a slot or waitlists
 int slot_manager_book(ServerContext *ctx,
                       int student_id,
                       const char *student_name,
@@ -305,6 +314,7 @@ int slot_manager_book(ServerContext *ctx,
     return 1;
 }
 
+// cancels a booking (force ok)
 int slot_manager_cancel(ServerContext *ctx, int student_id, int company_id, int round_id, int slot_id, int force) {
     Company *company;
     InterviewRound *round;
@@ -358,6 +368,7 @@ int slot_manager_cancel(ServerContext *ctx, int student_id, int company_id, int 
     return 0;
 }
 
+// marks a booking checked-in
 int slot_manager_checkin(ServerContext *ctx, int student_id, int company_id, int round_id, int slot_id) {
     Company *company;
     InterviewRound *round;
@@ -393,6 +404,7 @@ int slot_manager_checkin(ServerContext *ctx, int student_id, int company_id, int
     return 0;
 }
 
+// swaps two bookings atomically
 int slot_manager_atomic_swap(ServerContext *ctx,
                              int student_a,
                              int company_a,
@@ -447,6 +459,7 @@ int slot_manager_atomic_swap(ServerContext *ctx,
     return -1;
 }
 
+// adds a new slot to a round
 int slot_manager_add_slot(ServerContext *ctx, int company_id, int round_id, const char *time_window) {
     Company *company;
     InterviewRound *round;
@@ -496,6 +509,7 @@ int slot_manager_add_slot(ServerContext *ctx, int company_id, int round_id, cons
     return 0;
 }
 
+// finalizes slots after outcome
 int slot_manager_finalize_after_outcome(ServerContext *ctx,
                                         int student_id,
                                         int company_id,

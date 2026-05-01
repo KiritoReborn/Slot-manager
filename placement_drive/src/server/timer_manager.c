@@ -2,6 +2,7 @@
 
 static ServerContext *g_timer_ctx = NULL;
 
+// resolves round/slot pointers
 static int get_slot_ref(ServerContext *ctx,
                         int company_id,
                         int round_id,
@@ -38,6 +39,7 @@ static int get_slot_ref(ServerContext *ctx,
     return 0;
 }
 
+// timer callback for no-show
 static void on_noshow_timeout(union sigval sigval_data) {
     BookingContext *booking = (BookingContext *)sigval_data.sival_ptr;
     ServerContext *ctx = g_timer_ctx;
@@ -112,10 +114,12 @@ static void on_noshow_timeout(union sigval sigval_data) {
     free(booking);
 }
 
+// stores ctx for timer callbacks
 void timer_manager_init(ServerContext *ctx) {
     g_timer_ctx = ctx;
 }
 
+// disarms all active timers
 void timer_manager_shutdown(ServerContext *ctx) {
     int c;
     int r;
@@ -136,6 +140,7 @@ void timer_manager_shutdown(ServerContext *ctx) {
     }
 }
 
+// arms a no-show timer
 int timer_manager_arm(ServerContext *ctx, int student_id, int company_id, int round_id, int slot_id, int deadline_sec) {
     InterviewSlot *slot;
     BookingContext *booking;
@@ -187,6 +192,7 @@ int timer_manager_arm(ServerContext *ctx, int student_id, int company_id, int ro
     return 0;
 }
 
+// disarms timer for a slot
 int timer_manager_disarm(ServerContext *ctx, int company_id, int round_id, int slot_id) {
     InterviewSlot *slot;
 

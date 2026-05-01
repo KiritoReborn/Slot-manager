@@ -12,6 +12,7 @@ typedef struct {
 static WaitingRoom g_rooms[MAX_COMPANIES];
 static int g_waiting_room_initialized = 0;
 
+// checks if student already in queue
 static int queue_contains(const WaitingRoom *room, int student_id) {
     for (int i = 0; i < room->count; ++i) {
         int idx = (room->head + i) % WAITING_ROOM_CAPACITY;
@@ -22,6 +23,7 @@ static int queue_contains(const WaitingRoom *room, int student_id) {
     return 0;
 }
 
+// init all waiting rooms
 int waiting_room_init(void) {
     if (g_waiting_room_initialized) {
         return 0;
@@ -42,6 +44,7 @@ int waiting_room_init(void) {
     return 0;
 }
 
+// destroy waiting room locks
 void waiting_room_shutdown(void) {
     if (!g_waiting_room_initialized) {
         return;
@@ -55,6 +58,7 @@ void waiting_room_shutdown(void) {
     g_waiting_room_initialized = 0;
 }
 
+// wake up all waiting threads
 void waiting_room_wake_all(void) {
     if (!g_waiting_room_initialized) {
         return;
@@ -67,6 +71,7 @@ void waiting_room_wake_all(void) {
     }
 }
 
+// add student to company queue
 int waiting_room_join(int company_id, int student_id) {
     WaitingRoom *room;
 
@@ -101,6 +106,7 @@ int waiting_room_join(int company_id, int student_id) {
     return 0;
 }
 
+// pops next candidate if any
 int waiting_room_try_next_candidate(int company_id, int *out_student_id) {
     WaitingRoom *room;
 
@@ -126,6 +132,7 @@ int waiting_room_try_next_candidate(int company_id, int *out_student_id) {
     return 0;
 }
 
+// waits for next candidate (blocking)
 int waiting_room_next_candidate(int company_id, int *out_student_id, volatile sig_atomic_t *running_flag) {
     WaitingRoom *room;
 
@@ -160,6 +167,7 @@ int waiting_room_next_candidate(int company_id, int *out_student_id, volatile si
     return 0;
 }
 
+// gets current queue size
 int waiting_room_get_count(int company_id, int *out_count) {
     WaitingRoom *room;
 

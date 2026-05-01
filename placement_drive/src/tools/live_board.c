@@ -2,11 +2,13 @@
 
 static volatile sig_atomic_t g_running = 1;
 
+// ctrl+c handler to stop loop
 static void handle_sigint(int signo) {
     (void)signo;
     g_running = 0;
 }
 
+// draws a tiny progress bar
 static void render_fill_bar(int filled, int total) {
     int width = 20;
     int lit = (total > 0) ? (filled * width) / total : 0;
@@ -35,6 +37,7 @@ static void render_fill_bar(int filled, int total) {
     printf("]\033[0m");
 }
 
+// prints top few waitlist entries
 static void print_top_waitlisted(const PlacementState *state, int company_id, int round_id) {
     int printed = 0;
 
@@ -53,6 +56,7 @@ static void print_top_waitlisted(const PlacementState *state, int company_id, in
     printf("\n");
 }
 
+// renders the live board screen
 static void render_board(const PlacementState *state, const OutcomeTable *table, sem_t *rate_sem) {
     time_t now = time(NULL);
     struct tm tm_now;
@@ -113,6 +117,7 @@ static void render_board(const PlacementState *state, const OutcomeTable *table,
     fflush(stdout);
 }
 
+// live board entry
 int main(void) {
     int shm_id = -1;
     PlacementState *state;

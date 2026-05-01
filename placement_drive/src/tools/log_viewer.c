@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 
+// locks audit file for safe reads
 static int lock_fd(int fd, short lock_type) {
     struct flock fl;
     memset(&fl, 0, sizeof(fl));
@@ -12,6 +13,7 @@ static int lock_fd(int fd, short lock_type) {
     return fcntl(fd, F_SETLKW, &fl);
 }
 
+// case-insensitive substring check
 static int contains_case_insensitive(const char *haystack, const char *needle) {
     size_t hlen;
     size_t nlen;
@@ -44,6 +46,7 @@ static int contains_case_insensitive(const char *haystack, const char *needle) {
     return 0;
 }
 
+// audit log viewer entry
 int main(int argc, char **argv) {
     const char *keyword = NULL;
     int fd;

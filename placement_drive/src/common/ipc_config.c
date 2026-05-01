@@ -35,6 +35,7 @@ typedef struct {
     int waitlist_count;
 } PersistPlacementState;
 
+// writes full buffer to socket
 static int write_full(int fd, const void *buffer, size_t size) {
     const char *ptr = (const char *)buffer;
     size_t total = 0;
@@ -53,6 +54,7 @@ static int write_full(int fd, const void *buffer, size_t size) {
     return 0;
 }
 
+// reads exact size from socket
 static int read_full(int fd, void *buffer, size_t size) {
     char *ptr = (char *)buffer;
     size_t total = 0;
@@ -74,6 +76,7 @@ static int read_full(int fd, void *buffer, size_t size) {
     return 0;
 }
 
+// init process-shared mutex
 static int init_mutex_pshared(pthread_mutex_t *mutex) {
     pthread_mutexattr_t attr;
     if (pthread_mutexattr_init(&attr) != 0) {
@@ -91,6 +94,7 @@ static int init_mutex_pshared(pthread_mutex_t *mutex) {
     return 0;
 }
 
+// init process-shared rwlock
 static int init_rwlock_pshared(pthread_rwlock_t *rwlock) {
     pthread_rwlockattr_t attr;
     if (pthread_rwlockattr_init(&attr) != 0) {
@@ -108,6 +112,7 @@ static int init_rwlock_pshared(pthread_rwlock_t *rwlock) {
     return 0;
 }
 
+// builds default slot time window
 static void build_time_window(char *out, size_t out_size, int base_hour, int slot_idx) {
     int start_minutes_total = base_hour * 60 + slot_idx * 15;
     int end_minutes_total = start_minutes_total + 15;
@@ -120,6 +125,7 @@ static void build_time_window(char *out, size_t out_size, int base_hour, int slo
     snprintf(out, out_size, "%02d:%02d-%02d:%02d", sh, sm, eh, em);
 }
 
+// fills a round with default slots
 static void init_round(InterviewRound *round, int round_number, const char *round_name, int duration, int base_hour) {
     int i;
 
@@ -144,6 +150,7 @@ static void init_round(InterviewRound *round, int round_number, const char *roun
     }
 }
 
+// seeds company/round defaults in shm
 void ipc_seed_default_data(PlacementState *state) {
     static const char *company_names[] = {
         "Google", "Microsoft", "Amazon", "Apple", "Meta",
@@ -174,6 +181,7 @@ void ipc_seed_default_data(PlacementState *state) {
     }
 }
 
+// makes sure data dir/files exist
 int ipc_ensure_data_files(void) {
     struct stat st;
 
@@ -203,6 +211,7 @@ int ipc_ensure_data_files(void) {
     return 0;
 }
 
+// copies shm state into disk snapshot
 static void capture_persist_state(const PlacementState *src, PersistPlacementState *dst) {
     memset(dst, 0, sizeof(*dst));
 
@@ -246,6 +255,7 @@ static void capture_persist_state(const PlacementState *src, PersistPlacementSta
     }
 }
 
+// applies snapshot back into shm
 static void apply_persist_state(PlacementState *dst, const PersistPlacementState *src) {
     dst->active_student_connections = src->active_student_connections;
     dst->waitlist_count = src->waitlist_count;
@@ -301,6 +311,7 @@ static void apply_persist_state(PlacementState *dst, const PersistPlacementState
     }
 }
 
+// saves shm state to file
 int ipc_save_state(ServerContext *ctx) {
     PersistPlacementState snapshot;
     int fd;
@@ -327,6 +338,7 @@ int ipc_save_state(ServerContext *ctx) {
     return 0;
 }
 
+// loads shm state from file
 int ipc_load_state(ServerContext *ctx) {
     PersistPlacementState snapshot;
     int fd;
@@ -354,6 +366,7 @@ int ipc_load_state(ServerContext *ctx) {
     return 0;
 }
 
+// opens/mmap outcomes table
 int ipc_init_outcome_table(ServerContext *ctx) {
     struct stat st;
     int needs_init = 0;
@@ -405,6 +418,7 @@ int ipc_init_outcome_table(ServerContext *ctx) {
     return 0;
 }
 
+// closes/unmaps outcomes table
 void ipc_close_outcome_table(ServerContext *ctx) {
     if (!ctx) {
         return;
@@ -421,6 +435,7 @@ void ipc_close_outcome_table(ServerContext *ctx) {
     }
 }
 
+// full IPC init (shm/msgq/sem/files)
 int ipc_initialize(ServerContext *ctx, int create_new) {
     int created = 0;
 
@@ -503,6 +518,7 @@ int ipc_initialize(ServerContext *ctx, int create_new) {
     return 0;
 }
 
+// attaches shm state read-only
 PlacementState *ipc_attach_state_ro(int *out_shmid) {
     int shmid = shmget(SHM_KEY, sizeof(PlacementState), 0666);
     if (shmid < 0) {
@@ -521,6 +537,7 @@ PlacementState *ipc_attach_state_ro(int *out_shmid) {
     return state;
 }
 
+// detaches shm state ptr
 int ipc_detach_state(void *state_ptr) {
     if (!state_ptr) {
         return 0;
@@ -528,6 +545,7 @@ int ipc_detach_state(void *state_ptr) {
     return shmdt(state_ptr);
 }
 
+// cleanup IPC resources
 void ipc_cleanup(ServerContext *ctx, int unlink_all) {
     if (!ctx) {
         return;
@@ -564,6 +582,7 @@ void ipc_cleanup(ServerContext *ctx, int unlink_all) {
     ctx->msgq_id = -1;
 }
 
+// reads rate sem counts
 int ipc_get_rate_sem_active(sem_t *sem, int *active, int *capacity) {
     int value = 0;
     if (!sem || !active || !capacity) {
@@ -584,6 +603,7 @@ int ipc_get_rate_sem_active(sem_t *sem, int *active, int *capacity) {
     return 0;
 }
 
+// sends a packet over socket
 int send_packet(int fd, const NetworkPacket *packet) {
     if (!packet) {
         errno = EINVAL;
@@ -592,6 +612,7 @@ int send_packet(int fd, const NetworkPacket *packet) {
     return write_full(fd, packet, sizeof(*packet));
 }
 
+// receives a packet over socket
 int recv_packet(int fd, NetworkPacket *packet) {
     if (!packet) {
         errno = EINVAL;
@@ -600,6 +621,7 @@ int recv_packet(int fd, NetworkPacket *packet) {
     return read_full(fd, packet, sizeof(*packet));
 }
 
+// role enum to string
 const char *role_to_string(UserRole role) {
     switch (role) {
         case ROLE_ADMIN:
@@ -613,6 +635,7 @@ const char *role_to_string(UserRole role) {
     }
 }
 
+// string to role enum
 UserRole role_from_string(const char *text) {
     if (!text) {
         return ROLE_STUDENT;
@@ -626,6 +649,7 @@ UserRole role_from_string(const char *text) {
     return ROLE_STUDENT;
 }
 
+// outcome enum to string
 const char *outcome_to_string(InterviewOutcome outcome) {
     switch (outcome) {
         case OUTCOME_PENDING:
@@ -643,6 +667,7 @@ const char *outcome_to_string(InterviewOutcome outcome) {
     }
 }
 
+// string to outcome enum
 InterviewOutcome outcome_from_string(const char *text) {
     if (!text) {
         return OUTCOME_PENDING;

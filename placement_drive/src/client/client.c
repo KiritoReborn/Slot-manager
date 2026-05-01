@@ -15,6 +15,7 @@ typedef struct {
 } RequestResult;
 
 
+// locks a file fd (read/write)
 static int lock_fd(int fd, short lock_type) {
     struct flock fl;
     memset(&fl, 0, sizeof(fl));
@@ -25,6 +26,7 @@ static int lock_fd(int fd, short lock_type) {
     return fcntl(fd, F_SETLKW, &fl);
 }
 
+// chops trailing newline from input
 static void trim_newline(char *s) {
     if (!s) {
         return;
@@ -32,6 +34,7 @@ static void trim_newline(char *s) {
     s[strcspn(s, "\n")] = '\0';
 }
 
+// asks user for a line and trims it
 static int prompt_line(const char *label, char *out, size_t out_sz) {
     if (!label || !out || out_sz == 0) {
         return -1;
@@ -46,6 +49,7 @@ static int prompt_line(const char *label, char *out, size_t out_sz) {
     return 0;
 }
 
+// asks user for an int
 static int prompt_int(const char *label, int *out_value) {
     char line[64];
     if (!out_value || prompt_line(label, line, sizeof(line)) != 0) {
@@ -57,6 +61,7 @@ static int prompt_int(const char *label, int *out_value) {
     return 0;
 }
 
+// parses HH:MM into hours/mins
 static int parse_hhmm(const char *text, int *hours, int *minutes) {
     int h;
     int m;
@@ -75,6 +80,7 @@ static int parse_hhmm(const char *text, int *hours, int *minutes) {
 }
 
 
+// builds a time window string from minutes
 static void format_time_window_from_minutes(int start_minutes, int duration, char *out, size_t out_sz) {
     int end_minutes = start_minutes + duration;
     int sh = (start_minutes / 60) % 24;
@@ -84,6 +90,7 @@ static void format_time_window_from_minutes(int start_minutes, int duration, cha
     snprintf(out, out_sz, "%02d:%02d-%02d:%02d", sh, sm, eh, em);
 }
 
+// parses a users.txt line into a struct
 static int parse_user_line(const char *line, UserRecord *user) {
     char copy[512];
     char *token;
@@ -133,6 +140,7 @@ static int parse_user_line(const char *line, UserRecord *user) {
     return 0;
 }
 
+// local login prompt + check in users file
 static int local_login(UserRole role, UserRecord *out_user) {
     int fd;
     FILE *fp;
@@ -185,6 +193,7 @@ static int local_login(UserRole role, UserRecord *out_user) {
     return -1;
 }
 
+// loads all users from file into array
 static int load_all_users(UserRecord *users, int max_users, int *out_count) {
     int fd;
     FILE *fp;
@@ -225,6 +234,7 @@ static int load_all_users(UserRecord *users, int max_users, int *out_count) {
     return 0;
 }
 
+// writes user list back to file
 static int save_all_users(const UserRecord *users, int count) {
     int fd;
     FILE *fp;
@@ -273,6 +283,7 @@ static int save_all_users(const UserRecord *users, int count) {
     return 0;
 }
 
+// picks next user id
 static int next_user_id(const UserRecord *users, int count) {
     int max_id = 0;
     for (int i = 0; i < count; ++i) {
@@ -283,6 +294,7 @@ static int next_user_id(const UserRecord *users, int count) {
     return max_id + 1;
 }
 
+// finds user index by id
 static int find_user_index_by_id(const UserRecord *users, int count, int id) {
     for (int i = 0; i < count; ++i) {
         if (users[i].id == id) {
@@ -292,6 +304,7 @@ static int find_user_index_by_id(const UserRecord *users, int count, int id) {
     return -1;
 }
 
+// prints full user details
 static void print_full_user_info(const UserRecord *u) {
     if (!u) {
         return;
@@ -306,6 +319,7 @@ static void print_full_user_info(const UserRecord *u) {
     printf("Daily Bookings: %d\n", u->daily_bookings);
 }
 
+// admin flow to add a user
 static void admin_add_user(void) {
     UserRecord users[1024];
     int count = 0;
@@ -367,6 +381,7 @@ static void admin_add_user(void) {
     printf("User added successfully. New ID: %d\n", nu.id);
 }
 
+// admin flow to remove a user
 static void admin_remove_user(void) {
     UserRecord users[1024];
     int count = 0;
@@ -407,6 +422,7 @@ static void admin_remove_user(void) {
     printf("User removed successfully.\n");
 }
 
+// admin flow to edit a user
 static void admin_update_user(void) {
     UserRecord users[1024];
     int count = 0;
@@ -479,6 +495,7 @@ static void admin_update_user(void) {
     printf("User updated successfully.\n");
 }
 
+// returns user ptr by id
 static const UserRecord *find_user_by_id(const UserRecord *users, int count, int id) {
     for (int i = 0; i < count; ++i) {
         if (users[i].id == id) {
@@ -488,6 +505,7 @@ static const UserRecord *find_user_by_id(const UserRecord *users, int count, int
     return NULL;
 }
 
+// opens tcp connection to server
 static int connect_server(void) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in addr;
@@ -509,6 +527,7 @@ static int connect_server(void) {
     return fd;
 }
 
+// sends req and waits for reply
 static RequestResult send_request(int server_fd, NetworkPacket *request) {
     RequestResult rr;
     memset(&rr, 0, sizeof(rr));
@@ -527,6 +546,7 @@ static RequestResult send_request(int server_fd, NetworkPacket *request) {
     return rr;
 }
 
+// sends req and prints reply
 static int send_and_receive(int server_fd, NetworkPacket *request) {
     RequestResult rr = send_request(server_fd, request);
     if (!rr.ok) {
@@ -544,6 +564,7 @@ static int send_and_receive(int server_fd, NetworkPacket *request) {
     return 0;
 }
 
+// attaches shm state or warns
 static PlacementState *attach_state_or_warn(void) {
     int shmid = -1;
     PlacementState *state = ipc_attach_state_ro(&shmid);
@@ -554,6 +575,7 @@ static PlacementState *attach_state_or_warn(void) {
     return state;
 }
 
+// prints quick company slot summary
 static void print_companies_summary(const PlacementState *state) {
     printf("\n=== Company Slot Summary (Round 1) ===\n");
     printf("ID  Company         Filled/Total  Free\n");
@@ -577,6 +599,7 @@ static void print_companies_summary(const PlacementState *state) {
     printf("---------------------------------------\n\n");
 }
 
+// prints a grid of slots for one company
 static void print_company_slots_grid(const PlacementState *state, int company_id) {
     if (company_id <= 0 || company_id > MAX_COMPANIES) {
         printf("Invalid company id.\n");
@@ -613,6 +636,7 @@ static void print_company_slots_grid(const PlacementState *state, int company_id
     printf("\n");
 }
 
+// menu flow for slot map view
 static void view_slot_map_scalable(void) {
     PlacementState *state = attach_state_or_warn();
     int company_id;
@@ -628,6 +652,7 @@ static void view_slot_map_scalable(void) {
     ipc_detach_state(state);
 }
 
+// shows bookings + waitlist for a student
 static void print_student_own_bookings(int student_id) {
     PlacementState *state = attach_state_or_warn();
     int booked_found = 0;
@@ -683,6 +708,7 @@ static void print_student_own_bookings(int student_id) {
     ipc_detach_state(state);
 }
 
+// prints users by role
 static void admin_print_users_by_role(UserRole role) {
     UserRecord users[1024];
     int count = 0;
@@ -710,6 +736,7 @@ static void admin_print_users_by_role(UserRole role) {
     printf("Total %s: %d\n\n", role == ROLE_STUDENT ? "students" : "HRs", total);
 }
 
+// HR view of booked students
 static void hr_view_students_and_slots(int hr_company_id) {
     UserRecord users[1024];
     int user_count = 0;
@@ -765,6 +792,7 @@ static void hr_view_students_and_slots(int hr_company_id) {
     ipc_detach_state(state);
 }
 
+// HR dashboard wrapper
 static void hr_view_recruiter_dashboard(int hr_company_id) {
     PlacementState *state = attach_state_or_warn();
     if (state) {
@@ -774,6 +802,7 @@ static void hr_view_recruiter_dashboard(int hr_company_id) {
     hr_view_students_and_slots(hr_company_id);
 }
 
+// HR view for single student
 static void hr_view_student_info_by_id(void) {
     UserRecord users[1024];
     int count = 0;
@@ -801,6 +830,7 @@ static void hr_view_student_info_by_id(void) {
     printf("\n");
 }
 
+// HR batch add slots with time window
 static void hr_add_slots_batch(int server_fd, const UserRecord *user) {
     char start_text[32];
     int sh;
@@ -859,6 +889,7 @@ static void hr_add_slots_batch(int server_fd, const UserRecord *user) {
     printf("Batch add complete: %d/%d slots added.\n", ok_count, count);
 }
 
+// renders one dashboard frame
 static void render_dashboard_once(DashboardCtx *ctx) {
     int sem_value = 0;
     int active_connections = 0;
@@ -921,6 +952,7 @@ static void render_dashboard_once(DashboardCtx *ctx) {
     fflush(stdout);
 }
 
+// background loop to refresh dashboard
 static void *dashboard_thread(void *arg) {
     DashboardCtx *ctx = (DashboardCtx *)arg;
     while (ctx->running) {
@@ -930,6 +962,7 @@ static void *dashboard_thread(void *arg) {
     return NULL;
 }
 
+// runs live dashboard until user quits
 static void run_live_dashboard(void) {
     DashboardCtx ctx;
     pthread_t tid;
@@ -996,6 +1029,7 @@ static void run_live_dashboard(void) {
     printf("Dashboard closed.\n");
 }
 
+// prints last N audit log lines
 static void print_audit_tail(int tail_lines) {
     FILE *fp;
     char ring[50][1024];
@@ -1031,6 +1065,7 @@ static void print_audit_tail(int tail_lines) {
     printf("===========================\n\n");
 }
 
+// student menu loop
 static void student_menu(int server_fd, const UserRecord *user) {
     while (1) {
         int choice;
@@ -1098,6 +1133,7 @@ static void student_menu(int server_fd, const UserRecord *user) {
     }
 }
 
+// HR menu loop
 static void hr_menu(int server_fd, const UserRecord *user) {
     while (1) {
         int choice;
@@ -1179,6 +1215,7 @@ static void hr_menu(int server_fd, const UserRecord *user) {
     }
 }
 
+// admin sub-menu for user mgmt
 static void admin_manage_users_menu(void) {
     while (1) {
         int choice;
@@ -1228,6 +1265,7 @@ static void admin_manage_users_menu(void) {
     }
 }
 
+// admin menu loop
 static void admin_menu(int server_fd, const UserRecord *user) {
     while (1) {
         int choice;
@@ -1294,6 +1332,7 @@ static void admin_menu(int server_fd, const UserRecord *user) {
     }
 }
 
+// login + session for a role
 static void role_session(UserRole role) {
     UserRecord user;
     int server_fd;
@@ -1320,6 +1359,7 @@ static void role_session(UserRole role) {
     close(server_fd);
 }
 
+// main client entry
 int main(void) {
     printf("=== Campus Placement Mini Client ===\n");
 

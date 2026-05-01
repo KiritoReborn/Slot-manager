@@ -1,5 +1,6 @@
 #include "../common/models.h"
 
+// bounds check for outcome table indices
 static int valid_indices(int student_id, int company_id, int round_id) {
     if (student_id <= 0 || student_id > MAX_STUDENTS) {
         return 0;
@@ -13,6 +14,7 @@ static int valid_indices(int student_id, int company_id, int round_id) {
     return 1;
 }
 
+// writes outcome into shared table
 int outcome_tracker_set(ServerContext *ctx, int student_id, int company_id, int round_id, InterviewOutcome outcome) {
     if (!ctx || !ctx->outcome_table || !valid_indices(student_id, company_id, round_id)) {
         errno = EINVAL;
@@ -26,6 +28,7 @@ int outcome_tracker_set(ServerContext *ctx, int student_id, int company_id, int 
     return msync(ctx->outcome_table, sizeof(OutcomeTable), MS_ASYNC);
 }
 
+// reads outcome from shared table
 InterviewOutcome outcome_tracker_get(ServerContext *ctx, int student_id, int company_id, int round_id) {
     InterviewOutcome result = OUTCOME_PENDING;
 
@@ -40,6 +43,7 @@ InterviewOutcome outcome_tracker_get(ServerContext *ctx, int student_id, int com
     return result;
 }
 
+// async msync for outcomes table
 int outcome_tracker_sync_async(ServerContext *ctx) {
     if (!ctx || !ctx->outcome_table) {
         errno = EINVAL;
@@ -48,6 +52,7 @@ int outcome_tracker_sync_async(ServerContext *ctx) {
     return msync(ctx->outcome_table, sizeof(OutcomeTable), MS_ASYNC);
 }
 
+// full msync for outcomes table
 int outcome_tracker_sync_full(ServerContext *ctx) {
     if (!ctx || !ctx->outcome_table) {
         errno = EINVAL;

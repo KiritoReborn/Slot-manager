@@ -1,5 +1,6 @@
 #include "../common/models.h"
 
+// locks users file for safe access
 static int lock_fd(int fd, short lock_type) {
     struct flock fl;
     memset(&fl, 0, sizeof(fl));
@@ -10,6 +11,7 @@ static int lock_fd(int fd, short lock_type) {
     return fcntl(fd, F_SETLKW, &fl);
 }
 
+// parses users.txt line into struct
 static int parse_user_line(const char *line, UserRecord *user) {
     char copy[512];
     char *token;
@@ -79,6 +81,7 @@ static int parse_user_line(const char *line, UserRecord *user) {
     return 0;
 }
 
+// formats a user into csv line
 static int format_user_line(const UserRecord *user, char *out, size_t out_sz) {
     int n;
     if (!user || !out || out_sz == 0) {
@@ -101,6 +104,7 @@ static int format_user_line(const UserRecord *user, char *out, size_t out_sz) {
     return 0;
 }
 
+// grows + appends to a text buffer
 static int append_text(char **buffer, size_t *len, size_t *cap, const char *text) {
     size_t add_len = strlen(text);
     if (*len + add_len + 1 > *cap) {
@@ -127,6 +131,7 @@ typedef struct {
     int new_value;
 } DailyBookingMutatorArg;
 
+// edits a user record with a mutator
 static int update_user_record(int user_id, int (*mutator)(UserRecord *user, void *arg), void *arg, UserRecord *out_user) {
     int fd;
     FILE *fp = NULL;
@@ -235,6 +240,7 @@ static int update_user_record(int user_id, int (*mutator)(UserRecord *user, void
     return 0;
 }
 
+// sets ban count in a record
 static int set_ban_mutator(UserRecord *user, void *arg) {
     int value = *(int *)arg;
     if (value < 0) {
@@ -244,6 +250,7 @@ static int set_ban_mutator(UserRecord *user, void *arg) {
     return 0;
 }
 
+// increments no-show count
 static int increment_no_show_mutator(UserRecord *user, void *arg) {
     int *new_count = (int *)arg;
     user->ban_count += 1;
@@ -253,6 +260,7 @@ static int increment_no_show_mutator(UserRecord *user, void *arg) {
     return 0;
 }
 
+// updates daily bookings count
 static int update_daily_booking_mutator(UserRecord *user, void *arg) {
     DailyBookingMutatorArg *m = (DailyBookingMutatorArg *)arg;
     user->daily_bookings += m->delta;
@@ -263,6 +271,7 @@ static int update_daily_booking_mutator(UserRecord *user, void *arg) {
     return 0;
 }
 
+// validates username/password/role
 int auth_validate_user(const char *username, const char *password, UserRole expected_role, UserRecord *out_user) {
     int fd;
     FILE *fp;
@@ -307,6 +316,7 @@ int auth_validate_user(const char *username, const char *password, UserRole expe
     return -1;
 }
 
+// finds a user by id
 int auth_lookup_user_by_id(int user_id, UserRecord *out_user) {
     int fd;
     FILE *fp;
@@ -347,6 +357,7 @@ int auth_lookup_user_by_id(int user_id, UserRecord *out_user) {
     return -1;
 }
 
+// fetches cgpa + name for student
 int auth_lookup_cgpa(int student_id, float *out_cgpa, char *out_name, size_t out_name_len) {
     UserRecord user;
 
@@ -365,10 +376,12 @@ int auth_lookup_cgpa(int student_id, float *out_cgpa, char *out_name, size_t out
     return 0;
 }
 
+// sets ban count for student
 int auth_set_ban_count(int student_id, int ban_count) {
     return update_user_record(student_id, set_ban_mutator, &ban_count, NULL);
 }
 
+// increments no-show + returns count
 int auth_increment_no_show(int student_id, int *new_ban_count) {
     int temp = 0;
     int rc = update_user_record(student_id, increment_no_show_mutator, &temp, NULL);
@@ -378,6 +391,7 @@ int auth_increment_no_show(int student_id, int *new_ban_count) {
     return rc;
 }
 
+// updates daily booking count
 int auth_update_daily_bookings(int student_id, int delta, int *new_value) {
     DailyBookingMutatorArg arg;
     arg.delta = delta;
@@ -390,6 +404,7 @@ int auth_update_daily_bookings(int student_id, int delta, int *new_value) {
     return rc;
 }
 
+// checks if student is banned
 int auth_is_banned(int student_id, int *is_banned) {
     UserRecord user;
     if (!is_banned) {
@@ -405,6 +420,7 @@ int auth_is_banned(int student_id, int *is_banned) {
     return 0;
 }
 
+// appends a line to audit log
 int auth_append_audit(const char *event_name, const char *details) {
     int fd;
     char line[1024];

@@ -3,6 +3,7 @@
 static pthread_rwlock_t g_student_locks[MAX_STUDENTS];
 static int g_round_engine_initialized = 0;
 
+// init per-student rwlocks
 int round_engine_init(void) {
     int i;
     if (g_round_engine_initialized) {
@@ -23,6 +24,7 @@ int round_engine_init(void) {
     return 0;
 }
 
+// destroy per-student rwlocks
 void round_engine_shutdown(void) {
     int i;
     if (!g_round_engine_initialized) {
@@ -35,6 +37,7 @@ void round_engine_shutdown(void) {
     g_round_engine_initialized = 0;
 }
 
+// checks if student passed prev round
 int round_engine_can_book(ServerContext *ctx, int student_id, int company_id, int round_id) {
     InterviewOutcome prev_outcome;
 
@@ -64,6 +67,7 @@ int round_engine_can_book(ServerContext *ctx, int student_id, int company_id, in
     return 1;
 }
 
+// writes outcome + audit line
 int round_engine_mark_outcome(ServerContext *ctx, int student_id, int company_id, int round_id, InterviewOutcome outcome) {
     char audit_detail[256];
     const char *event_name = "ROUND_HOLD";
