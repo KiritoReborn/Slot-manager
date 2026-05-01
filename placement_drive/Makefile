@@ -1,7 +1,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -pthread -lrt -g
 SRCDIR  = src
-COMMON  = $(SRCDIR)/common/ipc_config.c $(SRCDIR)/common/fifo_manager.c
+COMMON  = $(SRCDIR)/common/ipc_config.c
 
 all: server client
 
@@ -20,7 +20,7 @@ client:
 	$(CC) $(CFLAGS) $(SRCDIR)/client/client.c $(COMMON) -o bin/client
 
 clean:
-	rm -f bin/* /tmp/placement_notify_* data/server.pid
+	rm -f bin/* data/server.pid
 	ipcrm -a 2>/dev/null || true
 	sem_unlink /placement_rate 2>/dev/null || true
 

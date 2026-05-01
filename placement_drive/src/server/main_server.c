@@ -11,7 +11,6 @@ typedef struct {
 
 static ServerContext g_ctx;
 static volatile sig_atomic_t g_stop_requested = 0;
-static volatile sig_atomic_t g_overrun_broadcast_requested = 0;
 
 static void decrease_active_connection_count(ServerContext *ctx) {
     if (!ctx || !ctx->state) {
@@ -48,11 +47,6 @@ static void signal_sigint(int signo) {
     }
 }
 
-static void signal_sigusr2(int signo) {
-    (void)signo;
-    g_overrun_broadcast_requested = 1;
-}
-
 static void signal_sigchld(int signo) {
     (void)signo;
     while (waitpid(-1, NULL, WNOHANG) > 0) {
@@ -66,13 +60,6 @@ static int install_signal_handlers(void) {
     sa.sa_handler = signal_sigint;
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGINT, &sa, NULL) != 0) {
-        return -1;
-    }
-
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = signal_sigusr2;
-    sigemptyset(&sa.sa_mask);
-    if (sigaction(SIGUSR2, &sa, NULL) != 0) {
         return -1;
     }
 
@@ -244,15 +231,6 @@ static int shift_overrun_and_queue_alerts(ServerContext *ctx,
         booked_student = slot->is_booked ? slot->booked_student_id : -1;
 
         if (booked_student > 0) {
-            struct overrun_msgbuf msg;
-            memset(&msg, 0, sizeof(msg));
-            msg.mtype = OVERRUN_ALERT_MTYPE;
-            msg.student_id = booked_student;
-            msg.company_id = company_id;
-            msg.slot_id = slot->slot_id;
-            msg.delay_minutes = delay_minutes;
-            strncpy(msg.new_time_window, slot->time_window, sizeof(msg.new_time_window) - 1);
-            msgsnd(ctx->msgq_id, &msg, sizeof(msg) - sizeof(long), IPC_NOWAIT);
             affected_students += 1;
         }
         pthread_mutex_unlock(&slot->slot_lock);
@@ -269,48 +247,6 @@ static int shift_overrun_and_queue_alerts(ServerContext *ctx,
     auth_append_audit("INTERVIEW_OVERRUN", audit_detail);
 
     return affected_students;
-}
-
-static void process_overrun_alerts(ServerContext *ctx) {
-    while (1) {
-        struct overrun_msgbuf msg;
-        NotifPacket notif;
-        char audit_detail[256];
-        ssize_t rc = msgrcv(ctx->msgq_id,
-                            &msg,
-                            sizeof(msg) - sizeof(long),
-                            OVERRUN_ALERT_MTYPE,
-                            IPC_NOWAIT);
-
-        if (rc < 0) {
-            if (errno == ENOMSG) {
-                break;
-            }
-            return;
-        }
-
-        memset(&notif, 0, sizeof(notif));
-        notif.type = NOTIF_OVERRUN;
-        notif.company_id = msg.company_id;
-        notif.round_id = 0;
-        notif.slot_id = msg.slot_id;
-        snprintf(notif.message,
-                 sizeof(notif.message),
-                 "Interview delayed by %d min. New slot time: %s",
-                 msg.delay_minutes,
-                 msg.new_time_window);
-        fifo_send_notification(msg.student_id, &notif);
-
-        snprintf(audit_detail,
-                 sizeof(audit_detail),
-                 "student=%d company=%d slot=%d delay=%d new_time=%s",
-                 msg.student_id,
-                 msg.company_id,
-                 msg.slot_id,
-                 msg.delay_minutes,
-                 msg.new_time_window);
-        auth_append_audit("OVERRUN_ALERT", audit_detail);
-    }
 }
 
 static void handle_student_request(ServerContext *ctx, int fd, const UserRecord *user, const NetworkPacket *req) {
@@ -392,22 +328,11 @@ static void handle_student_request(ServerContext *ctx, int fd, const UserRecord 
             int target_round = 0;
             int target_slot = 0;
             char audit_line[256];
-            NotifPacket notif;
 
             if (parse_swap_target(req->payload, &target_company, &target_round, &target_slot) != 0) {
                 send_reply(fd, REP_FAIL, user->id, "Swap payload must be: <company> <round_index> <slot_id>.");
                 break;
             }
-
-            memset(&notif, 0, sizeof(notif));
-            notif.type = NOTIF_SWAP_REQUEST;
-            notif.company_id = req->company_id;
-            notif.round_id = req->round_id;
-            notif.slot_id = req->slot_id;
-            snprintf(notif.message, sizeof(notif.message),
-                     "Swap request from student %d for c=%d r=%d s=%d",
-                     user->id, req->company_id, req->round_id, req->slot_id);
-            fifo_send_notification(req->target_student_id, &notif);
 
             snprintf(audit_line, sizeof(audit_line),
                      "SWAP_REQUEST from=%d to=%d source=(%d,%d,%d) target=(%d,%d,%d)",
@@ -430,7 +355,7 @@ static void handle_student_request(ServerContext *ctx, int fd, const UserRecord 
                     send_reply(fd, REP_FAIL, user->id, "Swap failed due to race or mismatched ownership.");
                 }
             } else {
-                send_reply(fd, REP_ALERT, user->id, "Swap request dispatched to target student via FIFO.");
+                send_reply(fd, REP_ALERT, user->id, "Swap request recorded.");
             }
             break;
         }
@@ -502,18 +427,7 @@ static void handle_hr_request(ServerContext *ctx, int fd, const UserRecord *user
                 if (auth_lookup_cgpa(student_id, &cgpa, student_name, sizeof(student_name)) == 0) {
                     int rc = slot_manager_book(ctx, student_id, student_name, cgpa, company_id, 0, slot_id);
                     if (rc == 0 || rc == 1) {
-                        NotifPacket notif;
                         char msg[256];
-                        memset(&notif, 0, sizeof(notif));
-                        notif.type = NOTIF_WAITING_ROOM_CALL;
-                        notif.company_id = company_id;
-                        notif.round_id = 0;
-                        notif.slot_id = slot_id;
-                        snprintf(notif.message,
-                                 sizeof(notif.message),
-                                 "You were called from waiting room. Slot %d assigned.",
-                                 slot_id);
-                        fifo_send_notification(student_id, &notif);
 
                         snprintf(msg,
                                  sizeof(msg),
@@ -544,12 +458,11 @@ static void handle_hr_request(ServerContext *ctx, int fd, const UserRecord *user
 
             int affected = shift_overrun_and_queue_alerts(ctx, company_id, req->round_id, req->slot_id, delay);
             if (affected >= 0) {
-                kill(getpid(), SIGUSR2);
                 ipc_save_state(ctx);
                 char msg[256];
                 snprintf(msg,
                          sizeof(msg),
-                         "Interview extended by %d min. Shifted subsequent slots. Alerts queued for %d students.",
+                         "Interview extended by %d min. Shifted subsequent slots for %d students.",
                          delay,
                          affected);
                 send_reply(fd, REP_SUCCESS, user->id, msg);
@@ -707,11 +620,6 @@ int main(void) {
         int client_fd;
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
-
-        if (g_overrun_broadcast_requested) {
-            g_overrun_broadcast_requested = 0;
-            process_overrun_alerts(&g_ctx);
-        }
 
         client_fd = accept(g_ctx.server_fd, (struct sockaddr *)&client_addr, &client_len);
         if (client_fd < 0) {

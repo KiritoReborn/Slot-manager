@@ -6,7 +6,6 @@ A terminal-based campus placement drive management system written in C. The proj
 
 - Multi-threaded server with TCP socket clients (student, HR, admin roles)
 - Priority waitlist using System V message queues
-- Named pipe (FIFO) notifications for students
 - POSIX real-time timers for no-show auto-cancel
 - POSIX semaphore rate limiting for concurrent connections
 - Shared memory live state (`PlacementState`)

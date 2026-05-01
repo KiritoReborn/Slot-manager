@@ -43,14 +43,7 @@
 
 #define CHECKIN_DEADLINE_SECONDS 1800
 #define WAITLIST_MAX_MTYPE 1000
-#define OVERRUN_ALERT_MTYPE 5000
 #define WAITING_ROOM_CAPACITY 256
-
-#define NOTIF_PROMOTED 1
-#define NOTIF_SWAP_REQUEST 2
-#define NOTIF_NOSHOW_WARNING 3
-#define NOTIF_OVERRUN 4
-#define NOTIF_WAITING_ROOM_CALL 5
 
 typedef enum {
     ROLE_ADMIN = 0,
@@ -171,22 +164,6 @@ struct waitlist_msgbuf {
     char student_name[64];
 };
 
-struct overrun_msgbuf {
-    long mtype;
-    int student_id;
-    int company_id;
-    int slot_id;
-    int delay_minutes;
-    char new_time_window[20];
-};
-
-typedef struct {
-    int type;
-    int company_id;
-    int round_id;
-    int slot_id;
-    char message[128];
-} NotifPacket;
 
 typedef struct {
     int id;
@@ -227,11 +204,6 @@ int ipc_get_rate_sem_active(sem_t *sem, int *active, int *capacity);
 int ipc_ensure_data_files(void);
 int ipc_save_state(ServerContext *ctx);
 int ipc_load_state(ServerContext *ctx);
-
-int fifo_build_path(int student_id, char *out_path, size_t out_path_sz);
-int fifo_create_for_student(int student_id);
-int fifo_cleanup_for_student(int student_id);
-int fifo_send_notification(int student_id, const NotifPacket *packet);
 
 int auth_validate_user(const char *username, const char *password, UserRole expected_role, UserRecord *out_user);
 int auth_lookup_user_by_id(int user_id, UserRecord *out_user);

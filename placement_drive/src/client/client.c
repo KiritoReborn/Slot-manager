@@ -14,10 +14,6 @@ typedef struct {
     NetworkPacket response;
 } RequestResult;
 
-typedef struct {
-    int fifo_fd;
-    volatile sig_atomic_t running;
-} StudentAlertCtx;
 
 static int lock_fd(int fd, short lock_type) {
     struct flock fl;
@@ -78,34 +74,6 @@ static int parse_hhmm(const char *text, int *hours, int *minutes) {
     return 0;
 }
 
-static void render_student_notification(const NotifPacket *pkt) {
-    if (!pkt) {
-        return;
-    }
-
-    printf("\n\033[1;32m+-----------------------------------------------------------+\033[0m\n");
-    printf("\033[1;32m| STUDENT ALERT: %-45s |\033[0m\n", pkt->message);
-    printf("\033[1;32m+-----------------------------------------------------------+\033[0m\n");
-    fflush(stdout);
-}
-
-static void *student_alert_listener(void *arg) {
-    StudentAlertCtx *ctx = (StudentAlertCtx *)arg;
-
-    while (ctx->running) {
-        NotifPacket pkt;
-        ssize_t n = read(ctx->fifo_fd, &pkt, sizeof(pkt));
-        if (n == (ssize_t)sizeof(pkt)) {
-            render_student_notification(&pkt);
-        } else if (n < 0 && errno != EAGAIN && errno != EINTR) {
-            usleep(100000);
-        } else {
-            usleep(100000);
-        }
-    }
-
-    return NULL;
-}
 
 static void format_time_window_from_minutes(int start_minutes, int duration, char *out, size_t out_sz) {
     int end_minutes = start_minutes + duration;
@@ -1072,7 +1040,7 @@ static void student_menu(int server_fd, const UserRecord *user) {
         req.round_id = 0;
 
         printf("\n--- Student Menu ---\n");
-        printf("1. View Slot Map (scalable)\n");
+        printf("1. View Slot Map\n");
         printf("2. View My Bookings\n");
         printf("3. Join Waiting Room Queue\n");
         printf("4. Book Slot\n");
@@ -1329,12 +1297,6 @@ static void admin_menu(int server_fd, const UserRecord *user) {
 static void role_session(UserRole role) {
     UserRecord user;
     int server_fd;
-    pthread_t alert_thread;
-    StudentAlertCtx alert_ctx;
-    int alerts_started = 0;
-    char fifo_path[128];
-
-    memset(&alert_ctx, 0, sizeof(alert_ctx));
 
     if (local_login(role, &user) != 0) {
         printf("Login failed.\n");
@@ -1348,36 +1310,11 @@ static void role_session(UserRole role) {
     }
 
     if (role == ROLE_STUDENT) {
-        if (fifo_create_for_student(user.id) == 0 && fifo_build_path(user.id, fifo_path, sizeof(fifo_path)) == 0) {
-            int fd = open(fifo_path, O_RDWR | O_NONBLOCK);
-            if (fd >= 0) {
-                alert_ctx.fifo_fd = fd;
-                alert_ctx.running = 1;
-                if (pthread_create(&alert_thread, NULL, student_alert_listener, &alert_ctx) == 0) {
-                    alerts_started = 1;
-                } else {
-                    close(fd);
-                }
-            }
-        }
-    }
-
-    if (role == ROLE_STUDENT) {
         student_menu(server_fd, &user);
     } else if (role == ROLE_HR) {
         hr_menu(server_fd, &user);
     } else {
         admin_menu(server_fd, &user);
-    }
-
-    if (alerts_started) {
-        alert_ctx.running = 0;
-        pthread_join(alert_thread, NULL);
-        close(alert_ctx.fifo_fd);
-    }
-
-    if (role == ROLE_STUDENT) {
-        fifo_cleanup_for_student(user.id);
     }
 
     close(server_fd);

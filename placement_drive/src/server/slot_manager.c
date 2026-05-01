@@ -210,7 +210,6 @@ int slot_manager_promote_waitlist(ServerContext *ctx, int company_id, int round_
     InterviewSlot *slot;
     struct waitlist_msgbuf promoted;
     char audit_detail[256];
-    NotifPacket notif;
 
     if (get_slot_ref(ctx, company_id, round_id, slot_id, &company, &round, &slot) != 0) {
         return -1;
@@ -242,14 +241,6 @@ int slot_manager_promote_waitlist(ServerContext *ctx, int company_id, int round_
     timer_manager_arm(ctx, promoted.student_id, company_id, round_id, slot_id, CHECKIN_DEADLINE_SECONDS);
     waitlist_shared_remove(ctx->state, promoted.student_id, company_id, round_id, slot_id);
 
-    memset(&notif, 0, sizeof(notif));
-    notif.type = NOTIF_PROMOTED;
-    notif.company_id = company_id;
-    notif.round_id = round_id;
-    notif.slot_id = slot_id;
-    snprintf(notif.message, sizeof(notif.message), "Promoted from waitlist: %s R%d %s",
-             company->company_name, round_id + 1, slot->time_window);
-    fifo_send_notification(promoted.student_id, &notif);
 
     snprintf(audit_detail, sizeof(audit_detail),
              "student=%d promoted company=%d round=%d slot=%d",
